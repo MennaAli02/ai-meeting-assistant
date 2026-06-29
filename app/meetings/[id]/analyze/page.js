@@ -13,6 +13,10 @@ export default function AnalyzePage({ params }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [emailContent, setEmailContent] = useState('')
+  const [showEmail, setShowEmail] = useState(false)
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     fetchMeeting()
@@ -79,6 +83,57 @@ export default function AnalyzePage({ params }) {
     setSaved(true)
   }
 
+  const generateEmail = async () => {
+  setEmailLoading(true)
+  try {
+    const response = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        meetingInfo: {
+          title: meeting.title,
+          date: meeting.date,
+          participants: meeting.participants?.join(', '),
+        },
+        aiResult: result
+      })
+    })
+    const data = await response.json()
+    setEmailContent(data.email)
+    setShowEmail(true)
+  } catch (err) {
+    setError('Failed to generate email')
+  }
+  setEmailLoading(false)
+}
+
+const downloadPDF = () => {
+  window.print()
+}
+
+const copyResults = () => {
+  const text = `
+MEETING: ${meeting.title}
+DATE: ${meeting.date}
+
+EXECUTIVE SUMMARY:
+${result.executive_summary}
+
+ACTION ITEMS:
+${result.action_items?.map(a => `• ${a.task} - ${a.owner} (${a.due_date})`).join('\n')}
+
+DECISIONS:
+${result.decisions_made?.join('\n')}
+
+RISKS:
+${result.risks?.join('\n')}
+  `.trim()
+
+  navigator.clipboard.writeText(text)
+  setCopied(true)
+  setTimeout(() => setCopied(false), 2000)
+}
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -131,7 +186,7 @@ export default function AnalyzePage({ params }) {
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+      <main id="report-content" className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm">
@@ -233,22 +288,86 @@ export default function AnalyzePage({ params }) {
           </ul>
         </div>
 
-        <div className="flex gap-3 flex-wrap pb-8">
-          <button
-            onClick={() => analyzeTranscript(meeting)}
-            className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
-            Re-analyze
-          </button>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
-            Back to Dashboard
-          </button>
+        {/* Export Buttons */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="font-semibold text-gray-900 mb-4">📤 Export & Share</h2>
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={downloadPDF}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              📄 Download PDF
+            </button>
+            <button
+              onClick={generateEmail}
+              disabled={emailLoading}
+              className="bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              {emailLoading ? 'Generating...' : '📧 Generate Follow-up Email'}
+            </button>
+            <button
+              onClick={copyResults}
+              className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              {copied ? '✅ Copied!' : '📋 Copy Results'}
+            </button>
+            <button
+              onClick={() => analyzeTranscript(meeting)}
+              className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              🔄 Re-analyze
+            </button>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              ← Dashboard
+            </button>
+          </div>
         </div>
+
+        {/* Email Modal */}
+        {showEmail && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Follow-up Email</h3>
+                <button
+                  onClick={() => setShowEmail(false)}
+                  className="text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+              <pre className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
+                {emailContent}
+              </pre>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(emailContent)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+                >
+                  {copied ? '✅ Copied!' : '📋 Copy Email'}
+                </button>
+                <button
+                  onClick={() => setShowEmail(false)}
+                  className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="pb-8" />
 
       </main>
     </div>
   )
 }
+
