@@ -2,6 +2,7 @@
 import { useEffect, useState, use } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import TopNav from '@/components/TopNav'
 
 export default function AnalyzePage({ params }) {
   const unwrappedParams = use(params)
@@ -17,6 +18,11 @@ export default function AnalyzePage({ params }) {
   const [showEmail, setShowEmail] = useState(false)
   const [emailLoading, setEmailLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   useEffect(() => {
     fetchMeeting()
@@ -84,35 +90,35 @@ export default function AnalyzePage({ params }) {
   }
 
   const generateEmail = async () => {
-  setEmailLoading(true)
-  try {
-    const response = await fetch('/api/email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        meetingInfo: {
-          title: meeting.title,
-          date: meeting.date,
-          participants: meeting.participants?.join(', '),
-        },
-        aiResult: result
+    setEmailLoading(true)
+    try {
+      const response = await fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meetingInfo: {
+            title: meeting.title,
+            date: meeting.date,
+            participants: meeting.participants?.join(', '),
+          },
+          aiResult: result
+        })
       })
-    })
-    const data = await response.json()
-    setEmailContent(data.email)
-    setShowEmail(true)
-  } catch (err) {
-    setError('Failed to generate email')
+      const data = await response.json()
+      setEmailContent(data.email)
+      setShowEmail(true)
+    } catch (err) {
+      setError('Failed to generate email')
+    }
+    setEmailLoading(false)
   }
-  setEmailLoading(false)
-}
 
-const downloadPDF = () => {
-  window.print()
-}
+  const downloadPDF = () => {
+    window.print()
+  }
 
-const copyResults = () => {
-  const text = `
+  const copyResults = () => {
+    const text = `
 MEETING: ${meeting.title}
 DATE: ${meeting.date}
 
@@ -127,30 +133,37 @@ ${result.decisions_made?.join('\n')}
 
 RISKS:
 ${result.risks?.join('\n')}
-  `.trim()
+    `.trim()
 
-  navigator.clipboard.writeText(text)
-  setCopied(true)
-  setTimeout(() => setCopied(false), 2000)
-}
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
+  // ── Loading states ────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Loading meeting...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4FF' }}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-4 border-[#4361EE]/30 border-t-[#4361EE] animate-spin" />
+          <p className="text-sm text-gray-400">Loading meeting...</p>
+        </div>
       </div>
     )
   }
 
   if (analyzing) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4FF' }}>
         <div className="text-center">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <span className="text-3xl">🤖</span>
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 animate-pulse"
+            style={{ background: '#EEF2FF' }}
+          >
+            <span className="text-4xl">🤖</span>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Analyzing your meeting...</h2>
-          <p className="text-gray-500 text-sm">Gemini AI is reading the transcript and extracting insights</p>
+          <h2 className="text-lg font-bold mb-2" style={{ color: '#1A1F36' }}>Analyzing your meeting...</h2>
+          <p className="text-sm" style={{ color: '#9CA3AF' }}>Gemini AI is reading the transcript and extracting insights</p>
         </div>
       </div>
     )
@@ -158,12 +171,13 @@ ${result.risks?.join('\n')}
 
   if (!result) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4FF' }}>
         <div className="text-center">
-          <p className="text-red-500 text-sm mb-3">{error || 'No results yet'}</p>
+          <p className="text-red-500 text-sm mb-4">{error || 'No results yet'}</p>
           <button
             onClick={() => analyzeTranscript(meeting)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+            style={{ background: '#4361EE' }}
+            className="text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             Try Again
           </button>
@@ -172,202 +186,274 @@ ${result.risks?.join('\n')}
     )
   }
 
+  // ── Section card helper ───────────────────────────────────────────────────
+  const Card = ({ children, className = '' }) => (
+    <div
+      className={`bg-white rounded-2xl p-6 shadow-sm ${className}`}
+      style={{ border: '1px solid #F0F4FF' }}
+    >
+      {children}
+    </div>
+  )
+
+  const SectionTitle = ({ emoji, bg, label }) => (
+    <h2 className="font-bold mb-4 flex items-center gap-2.5" style={{ color: '#1A1F36' }}>
+      <span
+        className="w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0"
+        style={{ background: bg }}
+      >
+        {emoji}
+      </span>
+      {label}
+    </h2>
+  )
+
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <button onClick={() => router.push('/dashboard')} className="text-gray-600 hover:text-gray-900 text-sm">
-            ← Dashboard
-          </button>
-          <span className="font-semibold text-gray-900">{meeting?.title}</span>
-          <span className={`text-xs px-3 py-1 rounded-full font-medium ${saved ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
-            {saved ? '✅ Saved' : 'Not saved'}
+    <div className="min-h-screen" style={{ background: '#F0F4FF' }}>
+      <TopNav userEmail={meeting?.user_id} onSignOut={handleSignOut} />
+
+      <main id="report-content" className="pt-14 p-8 space-y-5">
+
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: '#1A1F36' }}>{meeting?.title}</h1>
+            <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+              <span className="text-sm" style={{ color: '#9CA3AF' }}>📅 {meeting?.date}</span>
+              {meeting?.department && (
+                <span
+                  className="text-xs px-2.5 py-0.5 rounded-full font-semibold"
+                  style={{ background: '#EEF2FF', color: '#4361EE' }}
+                >
+                  {meeting.department}
+                </span>
+              )}
+              {meeting?.meeting_type && (
+                <span
+                  className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                  style={{ background: '#F3F4F6', color: '#6B7280' }}
+                >
+                  {meeting.meeting_type}
+                </span>
+              )}
+            </div>
+          </div>
+          <span className={`text-xs px-3 py-1.5 rounded-full font-semibold flex-shrink-0 mt-1 ${
+            saved ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+          }`}>
+            {saved ? '✅ Saved' : 'Saving...'}
           </span>
         </div>
-      </nav>
-
-      <main id="report-content" className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm">
+          <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm">
             {error}
-            <button onClick={() => analyzeTranscript(meeting)} className="ml-3 underline font-medium">
+            <button onClick={() => analyzeTranscript(meeting)} className="ml-3 underline font-semibold">
               Try again
             </button>
           </div>
         )}
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="text-sm text-gray-500">📅 {meeting?.date}</span>
-            <span className="text-sm text-gray-500">🏢 {meeting?.department}</span>
-            <span className="text-sm text-gray-500">📋 {meeting?.meeting_type}</span>
-            <span className="text-sm text-gray-500">👥 {meeting?.participants?.join(', ')}</span>
-          </div>
-        </div>
+        {result && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">📝 Executive Summary</h2>
-          <p className="text-gray-700 text-sm leading-relaxed">{result.executive_summary}</p>
-        </div>
+              {/* Executive Summary — full width */}
+              <Card className="col-span-2">
+                <SectionTitle emoji="📝" bg="#EEF2FF" label="Executive Summary" />
+                <p className="text-sm leading-relaxed" style={{ color: '#4B5563' }}>
+                  {result.executive_summary}
+                </p>
+              </Card>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">💬 Key Discussion Points</h2>
-          <ul className="space-y-2">
-            {result.key_discussion_points?.map((point, i) => (
-              <li key={i} className="flex gap-2 text-sm text-gray-700">
-                <span className="text-blue-500 font-bold">•</span>{point}
-              </li>
-            ))}
-          </ul>
-        </div>
+              {/* Key Discussion Points */}
+              <Card>
+                <SectionTitle emoji="💬" bg="#EFF6FF" label="Key Discussion Points" />
+                <ul className="space-y-2.5">
+                  {result.key_discussion_points?.map((point, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm" style={{ color: '#4B5563' }}>
+                      <span
+                        className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0"
+                        style={{ background: '#4361EE' }}
+                      />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">✅ Decisions Made</h2>
-          <ul className="space-y-2">
-            {result.decisions_made?.map((decision, i) => (
-              <li key={i} className="flex gap-2 text-sm text-gray-700">
-                <span className="text-green-500 font-bold">✓</span>{decision}
-              </li>
-            ))}
-          </ul>
-        </div>
+              {/* Decisions Made */}
+              <Card>
+                <SectionTitle emoji="✅" bg="#ECFDF5" label="Decisions Made" />
+                <ul className="space-y-2.5">
+                  {result.decisions_made?.map((d, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm" style={{ color: '#4B5563' }}>
+                      <span className="text-emerald-500 font-bold flex-shrink-0">✓</span>
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">🎯 Action Items</h2>
-          <div className="space-y-3">
-            {result.action_items?.map((item, i) => (
-              <div key={i} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
-                <div className="flex items-start justify-between gap-4">
-                  <p className="text-sm font-medium text-gray-900">{item.task}</p>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${
-                    item.priority === 'High' ? 'bg-red-100 text-red-700' :
-                    item.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-green-100 text-green-700'
-                  }`}>{item.priority}</span>
-                </div>
-                <div className="flex gap-4 mt-2">
-                  <span className="text-xs text-gray-500">👤 {item.owner}</span>
-                  <span className="text-xs text-gray-500">📅 {item.due_date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">⚠️ Risks</h2>
-          <ul className="space-y-2">
-            {result.risks?.map((risk, i) => (
-              <li key={i} className="flex gap-2 text-sm text-gray-700">
-                <span className="text-yellow-500">⚠</span>{risk}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">❓ Open Questions</h2>
-          <ul className="space-y-2">
-            {result.open_questions?.map((q, i) => (
-              <li key={i} className="flex gap-2 text-sm text-gray-700">
-                <span className="text-purple-500">?</span>{q}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">📧 Follow-up Recommendations</h2>
-          <ul className="space-y-2">
-            {result.follow_up_recommendations?.map((rec, i) => (
-              <li key={i} className="flex gap-2 text-sm text-gray-700">
-                <span className="text-blue-500">→</span>{rec}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Export Buttons */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">📤 Export & Share</h2>
-          <div className="flex gap-3 flex-wrap">
-            <button
-              onClick={downloadPDF}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              📄 Download PDF
-            </button>
-            <button
-              onClick={generateEmail}
-              disabled={emailLoading}
-              className="bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-            >
-              {emailLoading ? 'Generating...' : '📧 Generate Follow-up Email'}
-            </button>
-            <button
-              onClick={copyResults}
-              className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-            >
-              {copied ? '✅ Copied!' : '📋 Copy Results'}
-            </button>
-            <button
-              onClick={() => analyzeTranscript(meeting)}
-              className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-            >
-              🔄 Re-analyze
-            </button>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-            >
-              ← Dashboard
-            </button>
-          </div>
-        </div>
-
-        {/* Email Modal */}
-        {showEmail && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Follow-up Email</h3>
-                <button
-                  onClick={() => setShowEmail(false)}
-                  className="text-gray-400 hover:text-gray-600 text-xl"
-                >
-                  ✕
-                </button>
-              </div>
-              <pre className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
-                {emailContent}
-              </pre>
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(emailContent)
-                    setCopied(true)
-                    setTimeout(() => setCopied(false), 2000)
-                  }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-                >
-                  {copied ? '✅ Copied!' : '📋 Copy Email'}
-                </button>
-                <button
-                  onClick={() => setShowEmail(false)}
-                  className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
             </div>
-          </div>
+
+            {/* Action Items */}
+            <Card>
+              <SectionTitle emoji="🎯" bg="#FFF7ED" label="Action Items" />
+              <div className="space-y-2.5">
+                {result.action_items?.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-4 rounded-xl"
+                    style={{ background: '#F8FAFF', border: '1px solid #F0F4FF' }}
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold" style={{ color: '#1A1F36' }}>{item.task}</p>
+                      <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
+                        👤 {item.owner} &nbsp;·&nbsp; 📅 {item.due_date}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-3 py-1 rounded-full font-semibold ml-4 flex-shrink-0 ${
+                      item.priority === 'High' ? 'bg-red-50 text-red-600' :
+                      item.priority === 'Medium' ? 'bg-amber-50 text-amber-700' :
+                      'bg-emerald-50 text-emerald-700'
+                    }`}>
+                      {item.priority}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+              {/* Risks */}
+              <Card>
+                <SectionTitle emoji="⚠️" bg="#FEF2F2" label="Risks" />
+                <ul className="space-y-2.5">
+                  {result.risks?.map((risk, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm" style={{ color: '#4B5563' }}>
+                      <span className="text-orange-400 flex-shrink-0 font-bold">▲</span>
+                      {risk}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
+              {/* Open Questions */}
+              <Card>
+                <SectionTitle emoji="❓" bg="#FAF5FF" label="Open Questions" />
+                <ul className="space-y-2.5">
+                  {result.open_questions?.map((q, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm" style={{ color: '#4B5563' }}>
+                      <span className="text-purple-400 flex-shrink-0 font-bold">?</span>
+                      {q}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
+              {/* Follow-up Recommendations — full width */}
+              <Card className="col-span-2">
+                <SectionTitle emoji="📧" bg="#EFF6FF" label="Follow-up Recommendations" />
+                <ul className="space-y-2.5">
+                  {result.follow_up_recommendations?.map((rec, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm" style={{ color: '#4B5563' }}>
+                      <span style={{ color: '#4361EE' }} className="flex-shrink-0 font-bold">→</span>
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
+            </div>
+
+            {/* Export & Share */}
+            <Card>
+              <h2 className="font-bold mb-4" style={{ color: '#1A1F36' }}>Export &amp; Share</h2>
+              <div className="flex gap-3 flex-wrap">
+                <button
+                  onClick={downloadPDF}
+                  style={{ background: '#4361EE' }}
+                  className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity shadow-md shadow-blue-200"
+                >
+                  📄 Download PDF
+                </button>
+                <button
+                  onClick={generateEmail}
+                  disabled={emailLoading}
+                  className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  {emailLoading ? '⏳ Generating...' : '📧 Generate Email'}
+                </button>
+                <button
+                  onClick={copyResults}
+                  className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors hover:bg-gray-50"
+                  style={{ border: '1px solid #E5EAFF', color: '#4B5563' }}
+                >
+                  {copied ? '✅ Copied!' : '📋 Copy Results'}
+                </button>
+                <button
+                  onClick={() => analyzeTranscript(meeting)}
+                  className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors hover:bg-gray-50"
+                  style={{ border: '1px solid #E5EAFF', color: '#4B5563' }}
+                >
+                  🔄 Re-analyze
+                </button>
+              </div>
+            </Card>
+
+            {/* Email Modal */}
+            {showEmail && (
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div
+                  className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl"
+                  style={{ border: '1px solid #E5EAFF' }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg" style={{ color: '#1A1F36' }}>Follow-up Email</h3>
+                    <button
+                      onClick={() => setShowEmail(false)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors text-lg"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <pre
+                    className="text-sm whitespace-pre-wrap p-4 rounded-xl"
+                    style={{ background: '#F8FAFF', border: '1px solid #E5EAFF', color: '#4B5563' }}
+                  >
+                    {emailContent}
+                  </pre>
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(emailContent)
+                        setCopied(true)
+                        setTimeout(() => setCopied(false), 2000)
+                      }}
+                      style={{ background: '#4361EE' }}
+                      className="text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      {copied ? '✅ Copied!' : '📋 Copy Email'}
+                    </button>
+                    <button
+                      onClick={() => setShowEmail(false)}
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:bg-gray-50"
+                      style={{ border: '1px solid #E5EAFF', color: '#4B5563' }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="pb-8" />
+          </>
         )}
-
-        <div className="pb-8" />
-
       </main>
     </div>
   )
 }
-
